@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>For Meethi</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        #main-container { width: 100%; height: 100%; background-color: #2c3e50; transition: background 3s; position: relative; display: flex; justify-content: center; align-items: center; }
+        #overlay { position: absolute; z-index: 100; background: rgba(0,0,0,0.9); width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; color: white; cursor: pointer; text-align: center; font-family: sans-serif; }
+        canvas { position: absolute; top: 0; left: 0; }
+        #text-layer { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; text-align: center; z-index: 10; font-family: 'Georgia', serif; pointer-events: none; }
+        .message { font-size: 1.8rem; line-height: 1.6; color: #4a2c2c; text-shadow: 0 0 10px rgba(255,255,255,0.8); display: none; white-space: pre-wrap; }
+        #initial-text { font-size: 3rem; color: white; display: block; }
+        #closing { position: absolute; bottom: 15%; width: 100%; text-align: center; font-size: 2rem; color: white; opacity: 0; transition: opacity 2s; font-family: 'Comic Sans MS', cursive; z-index: 20; }
+        .pink-bg { background-color: #fffaf0 !important; }
+        .night-bg { background-color: #020111 !important; }
+    </style>
+</head>
+<body>
+
+<div id="overlay" onclick="startExperience()">
+    <div>
+        <h1>A gift for Meethi...</h1>
+        <p>Click anywhere to start the music & animation</p>
+        <p style="font-size: 12px; color: #888;">(Make sure birthday_song is in the same folder)</p>
+    </div>
+</div>
+
+<div id="main-container">
+    <canvas id="canvas"></canvas>
+    <div id="text-layer">
+        <div id="initial-text">HAPPIEST BIRTHDAY DARLING</div>
+        <div id="main-message" class="message"></div>
+    </div>
+    <div id="closing">hope i made you smile 😊</div>
+</div>
+
+<audio id="bgMusic" loop>
+    <source src="birthday_song.mpeg" type="audio/mpeg">
+    <source src="birthday_song" type="audio/mpeg">
+</audio>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('main-container');
+const initialText = document.getElementById('initial-text');
+const mainMsg = document.getElementById('main-message');
+const closingEl = document.getElementById('closing');
+const music = document.getElementById('bgMusic');
+
+let width, height, particles = [], branches = [], mode = 'bubbles', branchIdx = 0, fireworksArr = [];
+const fullText = "Happy birthday Meethi! \n\nMay the next year gives you all the love you deserve. And all your worries, problems and people who ever are hurting you just disappear from your life like they never existed. \n\nMay you have an Amazing and a SUCCSEXFULL year (Obviously with me 😁) ahead 😉";
+
+function resize() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+class Particle {
+    constructor(type) { this.type = type; this.reset(); }
+    reset() {
+        if (this.type === 'bubble') { this.x = Math.random() * width; this.y = height + 50; this.size = Math.random() * 15 + 5; this.speed = -(Math.random() * 2 + 1); this.velX = Math.random() * 1 - 0.5; }
+        else { this.x = Math.random() * width; this.y = -20; this.size = Math.random() * 5 + 5; this.speed = Math.random() * 2 + 1; this.angle = Math.random() * Math.PI * 2; }
+    }
+    update() {
+        if (this.type === 'bubble') { this.y += this.speed; this.x += this.velX; if (this.y < -50) this.reset(); }
+        else { this.y += this.speed; this.angle += 0.02; if (this.y > height) this.reset(); }
+    }
+    draw() {
+        ctx.beginPath();
+        if (this.type === 'bubble') { ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.stroke(); }
+        else { ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle); ctx.fillStyle = '#ffb7c5'; ctx.ellipse(0, 0, this.size, this.size/2, 0, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+    }
+}
+
+class Firework {
+    constructor() { this.x = Math.random() * width; this.y = height; this.targetY = Math.random() * (height/2); this.color = `hsl(${Math.random() * 360}, 100%, 60%)`; this.exploded = false; this.sparks = []; }
+    update() {
+        if (!this.exploded) { this.y -= 6; if (this.y <= this.targetY) { this.exploded = true; for(let i=0; i<40; i++) this.sparks.push({ x: this.x, y: this.y, vx: Math.cos(i) * (Math.random()*4), vy: Math.sin(i) * (Math.random()*4), alpha: 1 }); } }
+        else { this.sparks.forEach(s => { s.x += s.vx; s.y += s.vy; s.alpha -= 0.01; }); }
+    }
+    draw() {
+        if (!this.exploded) { ctx.fillStyle = 'white'; ctx.fillRect(this.x, this.y, 2, 4); }
+        else { this.sparks.forEach(s => { ctx.globalAlpha = s.alpha; ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(s.x, s.y, 2, 0, Math.PI*2); ctx.fill(); }); ctx.globalAlpha = 1; }
+    }
+}
+
+function createTree(x1, y1, angle, depth, branchWidth) {
+    if (depth === 0) return;
+    const x2 = x1 + Math.cos(angle) * depth * 10;
+    const y2 = y1 + Math.sin(angle) * depth * 10;
+    branches.push({ x1, y1, x2, y2, depth, branchWidth });
+    createTree(x2, y2, angle - 0.25, depth - 1, branchWidth * 0.7);
+    createTree(x2, y2, angle + 0.25, depth - 1, branchWidth * 0.7);
+}
+
+function animate() {
+    ctx.clearRect(0, 0, width, height);
+    if (mode === 'bubbles') { particles.forEach(p => { p.update(); p.draw(); }); } 
+    else if (mode === 'tree') {
+        if (branchIdx < branches.length) branchIdx += 1;
+        branches.slice(0, branchIdx).forEach(b => { ctx.strokeStyle = b.depth < 3 ? '#ffb7c5' : '#4a2c2c'; ctx.lineWidth = b.branchWidth; ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke(); });
+        particles.forEach(p => { p.update(); p.draw(); });
+    } 
+    else if (mode === 'fireworks') {
+        fireworksArr.forEach((f, i) => { f.update(); f.draw(); if (f.exploded && f.sparks.every(s => s.alpha <= 0)) fireworksArr.splice(i, 1); });
+        if (Math.random() < 0.05) fireworksArr.push(new Firework());
+    }
+    requestAnimationFrame(animate);
+}
+
+function startExperience() {
+    document.getElementById('overlay').style.display = 'none';
+    
+    // Attempt to play music and catch errors
+    music.play().catch(error => {
+        alert("Music file not found! Make sure your file is named birthday_song and is in the same folder as this HTML file.");
+    });
+    
+    for(let i=0; i<40; i++) particles.push(new Particle('bubble'));
+    animate();
+
+    setTimeout(() => {
+        initialText.style.transition = "opacity 1.5s";
+        initialText.style.opacity = "0";
+        setTimeout(() => {
+            initialText.style.display = "none";
+            container.classList.add('pink-bg');
+            mode = 'tree';
+            particles = [];
+            for(let i=0; i<60; i++) particles.push(new Particle('petal'));
+            createTree(width/2, height, -Math.PI/2, 10, 12);
+            setTimeout(() => { mainMsg.style.display = "block"; typeMessage(); }, 2000);
+        }, 1500);
+    }, 4000);
+}
+
+let charIdx = 0;
+function typeMessage() {
+    if (charIdx < fullText.length) { mainMsg.textContent += fullText.charAt(charIdx); charIdx++; setTimeout(typeMessage, 45); }
+    else { setTimeout(goToFireworks, 5000); }
+}
+
+function goToFireworks() {
+    mainMsg.style.transition = "opacity 2s";
+    mainMsg.style.opacity = "0";
+    container.classList.add('night-bg');
+    setTimeout(() => { mode = 'fireworks'; closingEl.style.opacity = "1"; }, 2000);
+}
+</script>
+</body>
+</html>s
